@@ -19,34 +19,38 @@ type
   { Implemented by the TAbstractNode class so that we can use Delphi's
     for..in loop. We explicitly make the process type stronger by
     requiring a new Add() method to be implemented; }
-  IAbstractNodeChildrenEnumerator = interface(IEnumerator<TAbstractNode>)
+  IAbstractNodeChildrenEnumerator = interface
   ['{4ACB6E5C-1835-4458-B83F-EC2EDF10A171}']
-      procedure Add(Element: TAbstractNode);
+    function GetCurrent: TAbstractNode;
+    function MoveNext: Boolean;
+    property Current: TAbstractNode read GetCurrent;
+    procedure Add(Element: TAbstractNode);
   end;
 
-  TAbstractNodeChildrenEnumerator = class (TInterfacedObject, IEnumerator,
-    IAbstractNodeChildrenEnumerator)
+  TAbstractNodeChildrenEnumerator = class (TInterfacedObject,
+      IAbstractNodeChildrenEnumerator)
     private
       fIndex: Integer;
       fRefList: TList<TAbstractNode>;
-      function GetCurrentItem: TAbstractNode;
     public
-      function GetCurrent: TObject;
-      function IAbstractNodeChildrenEnumerator.GetCurrent = GetCurrentItem;
-
+      { IAbstractNodeChildrenEnumerator }
+      function GetCurrent: TAbstractNode;
       function MoveNext: Boolean;
-      procedure Reset;
+      property Current: TAbstractNode read GetCurrent;
+
       procedure Add(Element: TAbstractNode);
 
       constructor Create;
       destructor Destroy; override;
   end;
 
-  TAbstractNode = class abstract (TInterfacedObject, IEnumerable)
+  TAbstractNode = class abstract (TInterfacedObject)
     protected
       fParent: TAbstractNode;
     public
-      function GetEnumerator: IEnumerator<TAbstractNode>;
+      function GetEnumerator: TAbstractNodeChildrenEnumerator;
+
+      procedure PrepareEnumerator(Enumerator: TAbstractNodeChildrenEnumerator); virtual; abstract;
 
       function HasChildren: Boolean; virtual; abstract;
       function SupportsChildren: Boolean; virtual; abstract;
@@ -85,6 +89,8 @@ type TBinaryNode = class abstract (TAbstractNode)
       fLeftNode: TAbstractNode;
       fRightNode: TAbstractNode;
   public
+    procedure PrepareEnumerator(Enumerator: TAbstractNodeChildrenEnumerator); override;
+
     function HasChildren: Boolean; override;
     function SupportsChildren: Boolean; override;
     function RequiredChildren: Integer; override;
@@ -117,19 +123,9 @@ begin
   fValue := Value;
 end;
 
-function TAbstractNodeChildrenEnumerator.GetCurrentItem: TAbstractNode;
+function TAbstractNodeChildrenEnumerator.GetCurrent: TAbstractNode;
 begin
   Result := fRefList[fIndex];
-end;
-
-function TAbstractNodeChildrenEnumerator.GetCurrent: TObject;
-begin
-  Result := GetCurrentItem;
-end;
-
-procedure TAbstractNodeChildrenEnumerator.Reset;
-begin
-  fIndex := 0;
 end;
 
 function TAbstractNodeChildrenEnumerator.MoveNext: Boolean;
@@ -146,7 +142,7 @@ end;
 constructor TAbstractNodeChildrenEnumerator.Create;
 begin
   fRefList := TList<TAbstractNode>.Create;
-  fIndex := 0;
+  fIndex := -1;
 end;
 
 destructor TAbstractNodeChildrenEnumerator.Destroy;
@@ -159,6 +155,8 @@ var
   Enumerator: TAbstractNodeChildrenEnumerator;
 begin
   Enumerator := TAbstractNodeChildrenEnumerator.Create;
+  PrepareEnumerator(Enumerator);
+
   Result := Enumerator;
 end;
 
@@ -227,6 +225,15 @@ begin
   if (fValueIsManaged) then
     fValue.Free;
   inherited;
+end;
+
+procedure TBinaryNode.PrepareEnumerator(Enumerator: TAbstractNodeChildrenEnumerator);
+begin
+  if Assigned(fLeftNode) then
+    Enumerator.Add(fLeftNode);
+
+  if Assigned(fRightNode) then
+    Enumerator.Add(fRightNode);
 end;
 
 function TBinaryNode.HasChildren: Boolean;
