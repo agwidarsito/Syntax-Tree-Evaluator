@@ -5,6 +5,5 @@
 !AspenSyntaxTree.pas
 !AspenSyntaxTreeExtensions.pas
 !.gitignore
-
-# ...even if they are in subdirectories
-!*/
+!README.md
+!LICENSE.md
