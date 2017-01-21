@@ -2,7 +2,7 @@ unit AspenSyntaxTree;
 
 interface
 
-uses SysUtils;
+uses SysUtils, Generics.Collections;
 
 type TSingleType = class (TObject)
   protected
@@ -12,24 +12,56 @@ type TSingleType = class (TObject)
     constructor Create(Value: Single);
 end;
 
-type TAbstractNode = class abstract (TObject)
-  protected
-    fParent: TAbstractNode;
-  public
-    function HasChildren: Boolean; virtual; abstract;
-    function SupportsChildren: Boolean; virtual; abstract;
-    function RequiredChildren: Integer; virtual; abstract;
-    function Count: Integer; virtual; abstract;
+type
+  TAbstractNode = class;
+  TAbstractNodeChildrenEnumerator = class;
 
-    { Returns an evaluated result not managed by this class! }
-    function Evaluate: TSingleType; virtual; abstract;
-    procedure Clear; virtual; abstract;
+  { Implemented by the TAbstractNode class so that we can use Delphi's
+    for..in loop. We explicitly make the process type stronger by
+    requiring a new Add() method to be implemented; }
+  IAbstractNodeChildrenEnumerator = interface(IEnumerator<TAbstractNode>)
+  ['{4ACB6E5C-1835-4458-B83F-EC2EDF10A171}']
+      procedure Add(Element: TAbstractNode);
+  end;
 
-    function HasParent: Boolean;
-    function Parent: TAbstractNode;
+  TAbstractNodeChildrenEnumerator = class (TInterfacedObject, IEnumerator,
+    IAbstractNodeChildrenEnumerator)
+    private
+      fIndex: Integer;
+      fRefList: TList<TAbstractNode>;
+      function GetCurrentItem: TAbstractNode;
+    public
+      function GetCurrent: TObject;
+      function IAbstractNodeChildrenEnumerator.GetCurrent = GetCurrentItem;
 
-    destructor Destroy; override;
-end;
+      function MoveNext: Boolean;
+      procedure Reset;
+      procedure Add(Element: TAbstractNode);
+
+      constructor Create;
+      destructor Destroy; override;
+  end;
+
+  TAbstractNode = class abstract (TInterfacedObject, IEnumerable)
+    protected
+      fParent: TAbstractNode;
+    public
+      function GetEnumerator: IEnumerator<TAbstractNode>;
+
+      function HasChildren: Boolean; virtual; abstract;
+      function SupportsChildren: Boolean; virtual; abstract;
+      function RequiredChildren: Integer; virtual; abstract;
+      function Count: Integer; virtual; abstract;
+
+      { Returns an evaluated result not managed by this class! }
+      function Evaluate: TSingleType; virtual; abstract;
+      procedure Clear; virtual; abstract;
+
+      function HasParent: Boolean;
+      function Parent: TAbstractNode;
+
+      destructor Destroy; override;
+  end;
 
 type TTerminalNode = class (TAbstractNode)
   protected
@@ -83,6 +115,51 @@ end;
 constructor TSingleType.Create(Value: Single);
 begin
   fValue := Value;
+end;
+
+function TAbstractNodeChildrenEnumerator.GetCurrentItem: TAbstractNode;
+begin
+  Result := fRefList[fIndex];
+end;
+
+function TAbstractNodeChildrenEnumerator.GetCurrent: TObject;
+begin
+  Result := GetCurrentItem;
+end;
+
+procedure TAbstractNodeChildrenEnumerator.Reset;
+begin
+  fIndex := 0;
+end;
+
+function TAbstractNodeChildrenEnumerator.MoveNext: Boolean;
+begin
+  Inc(fIndex);
+  Result := fIndex < fRefList.Count;
+end;
+
+procedure TAbstractNodeChildrenEnumerator.Add(Element: TAbstractNode);
+begin
+  fRefList.Add(Element);
+end;
+
+constructor TAbstractNodeChildrenEnumerator.Create;
+begin
+  fRefList := TList<TAbstractNode>.Create;
+  fIndex := 0;
+end;
+
+destructor TAbstractNodeChildrenEnumerator.Destroy;
+begin
+  fRefList.Free;
+end;
+
+function TAbstractNode.GetEnumerator: TAbstractNodeChildrenEnumerator;
+var
+  Enumerator: TAbstractNodeChildrenEnumerator;
+begin
+  Enumerator := TAbstractNodeChildrenEnumerator.Create;
+  Result := Enumerator;
 end;
 
 function TAbstractNode.HasParent: Boolean;
@@ -173,7 +250,6 @@ begin
 end;
 
 function TBinaryNode.Evaluate: TSingleType;
-begin
 var
   ValueA, ValueB: TSingleType;
   Evaluation: TSingleType;
