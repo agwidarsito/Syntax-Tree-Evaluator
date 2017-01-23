@@ -72,6 +72,8 @@ type TTerminalNode = class (TAbstractNode)
     fValue: TSingleType;
     fValueIsManaged: Boolean;
   public
+    procedure PrepareEnumerator(Enumerator: TAbstractNodeChildrenEnumerator); override;
+
     function HasChildren: Boolean; override;
     function SupportsChildren: Boolean; override;
     function RequiredChildren: Integer; override;
@@ -174,6 +176,11 @@ destructor TAbstractNode.Destroy;
 begin
   Clear;
   inherited;
+end;
+
+procedure TTerminalNode.PrepareEnumerator(Enumerator: TAbstractNodeChildrenEnumerator);
+begin
+  ;
 end;
 
 function TTerminalNode.HasChildren: Boolean;
